@@ -1,0 +1,30 @@
+version: '3'
+
+tasks:
+  up:
+    desc: 🚀 啟動所有容器 (Go + DB + Redis)
+    cmds:
+      - docker-compose up --build -d
+
+  down:
+    desc: 🛑 停止並移除容器
+    cmds:
+      - docker-compose down
+
+  bench:
+    desc: ⚡ 執行壓測 (模擬 100 併發)
+    cmds:
+      - oha -n 1000 -c 100 http://localhost:8080/projects/1
+
+  test-cache:
+    desc: 🔍 驗證緩存機制
+    cmds:
+      - curl -i http://localhost:8080/projects/1
+      - echo "\n--- 第二次請求 (預期應看到 X-Cache HIT) ---"
+      - curl -i http://localhost:8080/projects/1
+
+  clean:
+    desc: 🧹 清理 Go 編譯檔案與緩存
+    cmds:
+      - go clean
+      - docker-compose exec redis redis-cli flushall

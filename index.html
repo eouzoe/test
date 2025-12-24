@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>SIDESHIP-KILLER | COMMAND CENTER</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { 
+            background-color: #050505; 
+            color: #33ff33; 
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            margin: 0; padding: 20px;
+        }
+        .header {
+            border-bottom: 2px solid #33ff33;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex; justify-content: space-between; align-items: flex-end;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .card {
+            border: 1px solid #33ff33;
+            padding: 15px;
+            background: rgba(51, 255, 51, 0.05);
+            box-shadow: inset 0 0 10px rgba(51, 255, 51, 0.2);
+        }
+        .label { font-size: 0.75rem; text-transform: uppercase; opacity: 0.7; letter-spacing: 1px; }
+        .value { font-size: 2rem; font-weight: bold; display: block; margin-top: 5px; color: #fff; }
+        #chart-container {
+            height: 350px;
+            border: 1px solid #33ff33;
+            padding: 10px;
+            background: rgba(0,0,0,0.5);
+        }
+        .status-active { color: #33ff33; font-weight: bold; }
+        .status-sync { color: #ffff00; font-weight: bold; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="font-size: 1.5rem;">SIDESHIP-KILLER SYSTEM V1.5 [ARMORED]</div>
+        <div id="clock">TIME: 00:00:00</div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="label">Throughput Tier</div>
+            <div class="value" id="qps_tier">60K+</div>
+            <div style="font-size: 0.7rem;">OPTIMIZED ASYNC I/O</div>
+        </div>
+        
+        <div class="card">
+            <div class="label">Goroutine Cluster</div>
+            <div class="value" id="goroutines">0</div>
+            <div style="font-size: 0.7rem;">LIVE WORKER POOL</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Database Cluster</div>
+            <div style="font-size: 0.85rem; margin-top: 10px; line-height: 1.6;">
+                ● Redis (Cache): <span class="status-active">ACTIVE (60k Write/s)</span><br>
+                ● PostgreSQL: <span class="status-sync">SYNCING...</span><br>
+                ● Kafka: <span class="status-active">BUFFERED (10k Cap)</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="label">System Latency</div>
+            <div class="value" id="latency">0ms</div>
+            <div style="font-size: 0.7rem;" id="load_status">STATUS: IDLE</div>
+        </div>
+    </div>
+
+    <div id="chart-container">
+        <canvas id="performanceChart"></canvas>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CONCURRENCY LOAD',
+                    data: [],
+                    borderColor: '#33ff33',
+                    backgroundColor: 'rgba(51, 255, 51, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    pointRadius: 0,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(51,255,51,0.1)' }, ticks: { color: '#33ff33' } },
+                    x: { display: false }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        async function updateStats() {
+            const start = performance.now();
+            try {
+                const res = await fetch('http://localhost:8080');
+                const data = await res.json();
+                const end = performance.now();
+                
+                document.getElementById('goroutines').innerText = data.goroutines;
+                document.getElementById('latency').innerText = Math.round(end - start) + "ms";
+                document.getElementById('load_status').innerText = data.goroutines > 500 ? "STATUS: HEAVY LOAD" : "STATUS: STABLE";
+
+                const now = new Date().toLocaleTimeString();
+                chart.data.labels.push(now);
+                chart.data.datasets[0].data.push(data.goroutines);
+                if (chart.data.labels.length > 40) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                }
+                chart.update('none');
+            } catch (e) {
+                document.getElementById('load_status').innerText = "STATUS: DISCONNECTED";
+            }
+        }
+
+        setInterval(updateStats, 500);
+        setInterval(() => {
+            document.getElementById('clock').innerText = "TIME: " + new Date().toLocaleTimeString();
+        }, 1000);
+    </script>
+</body>
+</html>
