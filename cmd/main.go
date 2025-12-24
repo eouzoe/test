@@ -21,27 +21,31 @@ var (
 )
 
 func init() {
-	// 優先讀取雲端 Redis URL，否則連線本地
-	redisAddr := os.Getenv("REDIS_URL")
-	if redisAddr == "" {
-		redisAddr = "redis://localhost:6379"
+	// 1. 動態偵測 Redis (優先讀取雲端提供的變數)
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "redis://localhost:6379"
 	}
-
-	opt, err := redis.ParseURL(redisAddr)
+	
+	opt, err := redis.ParseURL(redisURL)
 	if err != nil {
-		log.Printf("Redis URL Parse Error: %v, using localhost default", err)
+		log.Printf("Redis URL Parse Error: %v, falling back to localhost", err)
 		rdb = redis.NewClient(&redis.Options{Addr: "localhost:6379", PoolSize: 1000})
 	} else {
 		opt.PoolSize = 1000
 		rdb = redis.NewClient(opt)
 	}
 
-	// 優先讀取雲端 DB URL，否則連線本地
+	// 2. 動態偵測 PostgreSQL
 	pgConn := os.Getenv("DATABASE_URL")
+	if pgConn == "" {
+		// 如果是雲端 Postgres，Zeabur 也可能給 POSTGRES_URL
+		pgConn = os.Getenv("POSTGRES_URL")
+	}
 	if pgConn == "" {
 		pgConn = "host=localhost port=5432 user=postgres password=mysecretpassword dbname=postgres sslmode=disable"
 	}
-
+	
 	var dbErr error
 	db, dbErr = sql.Open("postgres", pgConn)
 	if dbErr != nil {
@@ -52,15 +56,18 @@ func init() {
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	// Write-Behind 資料非同步寫入 Postgres
+	// 非同步資料庫寫入同步 (Write-Behind)
 	go func() {
 		for {
 			time.Sleep(5 * time.Second)
-			val, _ := rdb.Get(context.Background(), "total_requests").Int64()
-			if val > 0 && db != nil {
-				_, err := db.Exec("INSERT INTO system_logs (req_count) VALUES ($1)", val)
-				if err != nil {
-					log.Printf("SQL Insert Error: %v", err)
+			if rdb == nil || db == nil {
+				continue
+			}
+			val, err := rdb.Get(context.Background(), "total_requests").Int64()
+			if err == nil && val > 0 {
+				_, sqlErr := db.Exec("INSERT INTO system_logs (req_count) VALUES ($1)", val)
+				if sqlErr != nil {
+					log.Printf("DB Log Error: %v", sqlErr)
 				}
 			}
 		}
@@ -76,7 +83,13 @@ func main() {
 		default:
 		}
 
-		fmt.Fprintf(ctx, `{"status":"industrial_active","goroutines":%d}`, runtime.NumGoroutine())
+		fmt.Fprintf(ctx, "{\"status\":\"industrial_active\",\"goroutines\":%d}", runtime.NumGoroutine())
+	}
+
+	// 3. 動態偵測 Port (雲端分配的 Port)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
 
 	s := &fasthttp.Server{
@@ -85,12 +98,7 @@ func main() {
 		ReadTimeout: 5 * time.Second,
 	}
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("🚀 戰神引擎已啟動 | 監聽 :%s", port)
+	log.Printf("🚀 戰神引擎雲端版啟動 | 監聽端口: %s", port)
 	if err := s.ListenAndServe(":" + port); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
