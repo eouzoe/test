@@ -2,9 +2,14 @@ services:
   app:
     build: .
     ports: ["8080:8080"]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'     # 限制只用半顆 CPU，防止 Vibe coding 寫出死循環卡死電腦
+          memory: 512M    # 限制 512MB RAM
     environment:
-      - DB_URL=postgres://user:pass@db:5432/mydb?sslmode=disable
-      - REDIS_URL=redis:6379
+      - DATABASE_URL=postgres://user:pass@db:5432/mydb?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       db:
         condition: service_healthy
@@ -13,6 +18,12 @@ services:
   db:
     image: postgres:17-alpine
     environment: [POSTGRES_PASSWORD=pass, POSTGRES_USER=user, POSTGRES_DB=mydb]
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data  # 映射到當前目錄的 pgdata 資料夾
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
       interval: 3s
@@ -20,6 +31,8 @@ services:
       retries: 5
   redis:
     image: redis:7-alpine
+    volumes:
+      - ./redisdata:/data                  # 映射 Redis 數據
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s

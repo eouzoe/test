@@ -2,141 +2,442 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>SIDESHIP-KILLER | COMMAND CENTER</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SideShip - 讓想法啟航</title>
     <style>
-        body { 
-            background-color: #050505; 
-            color: #33ff33; 
-            font-family: 'JetBrains Mono', 'Courier New', monospace;
-            margin: 0; padding: 20px;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .header {
-            border-bottom: 2px solid #33ff33;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-            display: flex; justify-content: space-between; align-items: flex-end;
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            color: white;
+            overflow-x: hidden;
         }
-        .grid {
+
+        /* 綠色漸層背景 */
+        .gradient-bg {
+            background: linear-gradient(180deg, #10b981 0%, #34d399 100%);
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* 波浪裝飾 */
+        .wave {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 150px;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%23ffffff' fill-opacity='0.1' d='M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") no-repeat bottom;
+            background-size: cover;
+        }
+
+        /* 導航欄 */
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .logo-icon {
+            font-size: 24px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 16px;
+            transition: opacity 0.2s;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .btn-login, .btn-register {
+            padding: 8px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn-login {
+            color: white;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-login:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-register {
+            color: #10b981;
+            background: white;
+            font-weight: 500;
+        }
+
+        .btn-register:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .lang-selector {
+            display: flex;
+            gap: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 4px;
+        }
+
+        .lang-option {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .lang-option.active {
+            background: white;
+            color: #10b981;
+            font-weight: 500;
+        }
+
+        .lang-option:not(.active) {
+            color: white;
+        }
+
+        /* 主要內容區 */
+        .hero {
+            text-align: center;
+            padding: 80px 20px 120px;
+            position: relative;
+            z-index: 5;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 64px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            font-size: 20px;
+            margin-bottom: 40px;
+            opacity: 0.95;
+            line-height: 1.6;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary, .btn-secondary {
+            padding: 14px 32px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #10b981;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* 特色區塊 */
+        .features {
+            padding: 100px 40px;
+            background: white;
+            color: #1f2937;
+        }
+
+        .features-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .features-title {
+            text-align: center;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 60px;
+            color: #10b981;
+        }
+
+        .features-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+        }
+
+        .feature-card {
+            text-align: center;
+        }
+
+        .feature-icon {
+            font-size: 48px;
             margin-bottom: 20px;
         }
-        .card {
-            border: 1px solid #33ff33;
-            padding: 15px;
-            background: rgba(51, 255, 51, 0.05);
-            box-shadow: inset 0 0 10px rgba(51, 255, 51, 0.2);
+
+        .feature-card h3 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
         }
-        .label { font-size: 0.75rem; text-transform: uppercase; opacity: 0.7; letter-spacing: 1px; }
-        .value { font-size: 2rem; font-weight: bold; display: block; margin-top: 5px; color: #fff; }
-        #chart-container {
-            height: 350px;
-            border: 1px solid #33ff33;
-            padding: 10px;
-            background: rgba(0,0,0,0.5);
+
+        .feature-card p {
+            font-size: 16px;
+            color: #6b7280;
+            line-height: 1.6;
         }
-        .status-active { color: #33ff33; font-weight: bold; }
-        .status-sync { color: #ffff00; font-weight: bold; animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0.3; } }
+
+        /* 底部 CTA */
+        .bottom-cta {
+            padding: 100px 40px;
+            background: white;
+            text-align: center;
+        }
+
+        .bottom-cta h2 {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 24px;
+        }
+
+        .bottom-cta p {
+            font-size: 18px;
+            color: #6b7280;
+            margin-bottom: 40px;
+        }
+
+        /* Footer */
+        footer {
+            background: #1f2937;
+            color: white;
+            padding: 60px 40px 40px;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .footer-logo {
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 30px;
+        }
+
+        .footer-links a {
+            color: #9ca3af;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: white;
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: 40px;
+            border-top: 1px solid #374151;
+            color: #9ca3af;
+        }
+
+        /* 響應式設計 */
+        @media (max-width: 768px) {
+            nav {
+                padding: 15px 20px;
+            }
+
+            .nav-links {
+                gap: 15px;
+            }
+
+            .hero h1 {
+                font-size: 40px;
+            }
+
+            .hero p {
+                font-size: 18px;
+            }
+
+            .features {
+                padding: 60px 20px;
+            }
+
+            .features-title {
+                font-size: 28px;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div style="font-size: 1.5rem;">SIDESHIP-KILLER SYSTEM V1.5 [ARMORED]</div>
-        <div id="clock">TIME: 00:00:00</div>
-    </div>
+    <div class="gradient-bg">
+        <!-- 導航欄 -->
+        <nav>
+            <div class="logo">
+                <span class="logo-icon">🚀</span>
+                <span>SideShip</span>
+            </div>
+            <div class="nav-links">
+                <a href="#projects">專案</a>
+                <a href="#blog">部落格</a>
+            </div>
+            <div class="nav-actions">
+                <a href="#login" class="btn-login">登入</a>
+                <a href="#register" class="btn-register">註冊</a>
+                <div class="lang-selector">
+                    <span class="lang-option">EN</span>
+                    <span class="lang-option active">中文</span>
+                </div>
+            </div>
+        </nav>
 
-    <div class="grid">
-        <div class="card">
-            <div class="label">Throughput Tier</div>
-            <div class="value" id="qps_tier">60K+</div>
-            <div style="font-size: 0.7rem;">OPTIMIZED ASYNC I/O</div>
-        </div>
-        
-        <div class="card">
-            <div class="label">Goroutine Cluster</div>
-            <div class="value" id="goroutines">0</div>
-            <div style="font-size: 0.7rem;">LIVE WORKER POOL</div>
-        </div>
-
-        <div class="card">
-            <div class="label">Database Cluster</div>
-            <div style="font-size: 0.85rem; margin-top: 10px; line-height: 1.6;">
-                ● Redis (Cache): <span class="status-active">ACTIVE (60k Write/s)</span><br>
-                ● PostgreSQL: <span class="status-sync">SYNCING...</span><br>
-                ● Kafka: <span class="status-active">BUFFERED (10k Cap)</span>
+        <!-- 主要內容 -->
+        <div class="hero">
+            <h1>讓想法啟航</h1>
+            <p>AI 時代，人人都能打造產品。把你的點子變成現實，分享給全世界。</p>
+            <div class="cta-buttons">
+                <a href="#start" class="btn-primary">
+                    <span>🚀</span>
+                    <span>開始啟航</span>
+                </a>
+                <a href="#explore" class="btn-secondary">
+                    <span>🧭</span>
+                    <span>探索專案</span>
+                </a>
             </div>
         </div>
 
-        <div class="card">
-            <div class="label">System Latency</div>
-            <div class="value" id="latency">0ms</div>
-            <div style="font-size: 0.7rem;" id="load_status">STATUS: IDLE</div>
+        <!-- 波浪裝飾 -->
+        <div class="wave"></div>
+    </div>
+
+    <!-- 特色區塊 -->
+    <section class="features">
+        <div class="features-container">
+            <h2 class="features-title">為什麼選擇 SideShip？</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>用 AI 打造</h3>
+                    <p>AI 讓開發變得前所未有的簡單。別找藉口，直接上線！</p>
+                    <p style="margin-top: 8px; font-size: 14px; color: #10b981;">AI 時代</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💬</div>
+                    <h3>分享與成長</h3>
+                    <p>從社群獲得回饋。每個想法都值得被聽見。</p>
+                    <p style="margin-top: 8px; font-size: 14px; color: #10b981;">社群力量</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌍</div>
+                    <h3>尋找靈感</h3>
+                    <p>看看其他人在做什麼。找到你的下一個靈感或夥伴。</p>
+                    <p style="margin-top: 8px; font-size: 14px; color: #10b981;">全球創客</p>
+                </div>
+            </div>
         </div>
-    </div>
+    </section>
 
-    <div id="chart-container">
-        <canvas id="performanceChart"></canvas>
-    </div>
+    <!-- 底部 CTA -->
+    <section class="bottom-cta">
+        <h2>你的想法值得被實現</h2>
+        <p>別再空想，開始動手。有了 AI，你今天就能讓專案上線。</p>
+        <a href="#start" class="btn-primary" style="background: #10b981; color: white;">
+            <span>🚀</span>
+            <span>開始啟航</span>
+        </a>
+    </section>
 
-    <script>
-        const ctx = document.getElementById('performanceChart').getContext('2d');
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'CONCURRENCY LOAD',
-                    data: [],
-                    borderColor: '#33ff33',
-                    backgroundColor: 'rgba(51, 255, 51, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    pointRadius: 0,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(51,255,51,0.1)' }, ticks: { color: '#33ff33' } },
-                    x: { display: false }
-                },
-                plugins: { legend: { display: false } }
-            }
-        });
-
-        async function updateStats() {
-            const start = performance.now();
-            try {
-                const res = await fetch('http://localhost:8080');
-                const data = await res.json();
-                const end = performance.now();
-                
-                document.getElementById('goroutines').innerText = data.goroutines;
-                document.getElementById('latency').innerText = Math.round(end - start) + "ms";
-                document.getElementById('load_status').innerText = data.goroutines > 500 ? "STATUS: HEAVY LOAD" : "STATUS: STABLE";
-
-                const now = new Date().toLocaleTimeString();
-                chart.data.labels.push(now);
-                chart.data.datasets[0].data.push(data.goroutines);
-                if (chart.data.labels.length > 40) {
-                    chart.data.labels.shift();
-                    chart.data.datasets[0].data.shift();
-                }
-                chart.update('none');
-            } catch (e) {
-                document.getElementById('load_status').innerText = "STATUS: DISCONNECTED";
-            }
-        }
-
-        setInterval(updateStats, 500);
-        setInterval(() => {
-            document.getElementById('clock').innerText = "TIME: " + new Date().toLocaleTimeString();
-        }, 1000);
-    </script>
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-logo">
+                <span>🚀</span>
+                <span>SideShip</span>
+            </div>
+            <div class="footer-links">
+                <a href="#projects">專案</a>
+                <a href="#feedback">意見回饋</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>© 2025 SideShip. 與世界分享你的副業專案。</p>
+        </div>
+    </footer>
 </body>
 </html>
