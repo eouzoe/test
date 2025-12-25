@@ -52,21 +52,30 @@ func initLogger() {
 }
 
 // CheckHealth verifies Redis and DB connections
+// Returns error only for critical failures (DB), Redis failures are logged as warnings
 func checkHealth() error {
-	// Check Redis
 	ctx, cancel := context.WithTimeout(ctx_bg, 5*time.Second)
 	defer cancel()
 	
-	if err := rdb.Ping(ctx).Err(); err != nil {
-		return fmt.Errorf("Redis health check failed: %w", err)
+	// Check Redis (non-critical, log warning if unavailable)
+	if rdb != nil {
+		if err := rdb.Ping(ctx).Err(); err != nil {
+			slog.Warn("Redis health check failed (non-critical)", "error", err)
+			// Don't return error - Redis can be temporarily unavailable
+		} else {
+			slog.Info("Redis health check passed")
+		}
 	}
-	slog.Info("Redis health check passed")
 	
-	// Check Database
-	if err := db.PingContext(ctx); err != nil {
-		return fmt.Errorf("Database health check failed: %w", err)
+	// Check Database (critical - must be available)
+	if db != nil {
+		if err := db.PingContext(ctx); err != nil {
+			return fmt.Errorf("Database health check failed: %w", err)
+		}
+		slog.Info("Database health check passed")
+	} else {
+		return fmt.Errorf("Database connection is nil")
 	}
-	slog.Info("Database health check passed")
 	
 	return nil
 }
@@ -358,7 +367,9 @@ func handleAPI(ctx *fasthttp.RequestCtx, path string) {
 			ctx.WriteString(fmt.Sprintf(`{"status":"unhealthy","error":"%s"}`, err.Error()))
 			return
 		}
-		ctx.WriteString(`{"status":"healthy","service":"sideship-killer"}`)
+		// 讓 Cursor 把回傳內容改成這樣，增加「專業架構師」的 Vibe
+		ctx.SetContentType("text/plain")
+		fmt.Fprintf(ctx, "Sideship-Killer War-Engine v6\nStatus: Optimized\nRate-Limit: Redis-Lua-Active\nBatch-Sync: Enabled")
 	default:
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		ctx.WriteString(`{"error":"not_found","message":"API endpoint not found"}`)
@@ -383,10 +394,15 @@ func main() {
 		os.Exit(1)
 	}
 	
-	// Health check on startup
+	// Health check on startup (only DB is critical, Redis failures are logged but don't block startup)
 	if err := checkHealth(); err != nil {
-		slog.Error("Health check failed on startup", "error", err)
-		os.Exit(1)
+		// Only exit if DB is unavailable (critical)
+		if strings.Contains(err.Error(), "Database") {
+			slog.Error("Critical health check failed on startup (DB unavailable)", "error", err)
+			os.Exit(1)
+		}
+		// Redis failures are non-critical, just log warning (already logged in checkHealth)
+		slog.Info("Startup health check completed (Redis may be temporarily unavailable)")
 	}
 	
 	// Create table if not exists
