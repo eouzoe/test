@@ -11,8 +11,8 @@ services:
           cpus: '0.5'     # 限制只用半顆 CPU，防止 Vibe coding 寫出死循環卡死電腦
           memory: 512M    # 限制 512MB RAM
     environment:
-      - DATABASE_URL=postgres://user:pass@db:5432/mydb?sslmode=disable
-      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL:-postgres://user:pass@db:5432/mydb?sslmode=disable}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
     depends_on:
       db:
         condition: service_healthy
