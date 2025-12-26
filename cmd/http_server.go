@@ -93,6 +93,20 @@ func registerHTTPHandlers(addr string) {
 
     mux := http.NewServeMux()
 
+    // Static assets: serve /assets/ and fallback to ./static
+    mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets"))))
+    mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
+    // common icons
+    mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+        http.ServeFile(w, r, "./static/favicon.ico")
+    })
+    mux.HandleFunc("/favicon.svg", func(w http.ResponseWriter, r *http.Request) {
+        http.ServeFile(w, r, "./static/favicon.svg")
+    })
+    mux.HandleFunc("/apple-touch-icon.png", func(w http.ResponseWriter, r *http.Request) {
+        http.ServeFile(w, r, "./static/apple-touch-icon.png")
+    })
+
     // 1. Home
     mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
         if r.URL.Path != "/" {
@@ -123,74 +137,135 @@ func registerHTTPHandlers(addr string) {
         renderTemplate(w, "blogs", r, nil)
     })
 
-    // API: register (JSON)
+    // API: register (accept JSON or form POST)
     mux.HandleFunc("/api/auth/register", func(w http.ResponseWriter, r *http.Request) {
         if r.Method != http.MethodPost {
             http.Error(w, "method", http.StatusMethodNotAllowed)
             return
         }
-        var req struct{
-            Username string `json:"username"`
-            Password string `json:"password"`
-            Email    string `json:"email"`
+        var username, password, email string
+        ctype := r.Header.Get("Content-Type")
+        if strings.Contains(ctype, "application/json") {
+            var req struct{
+                Username string `json:"username"`
+                Password string `json:"password"`
+                Email    string `json:"email"`
+            }
+            if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+                http.Error(w, "bad payload", http.StatusBadRequest)
+                return
+            }
+            username = req.Username
+            password = req.Password
+            email = req.Email
+        } else {
+            if err := r.ParseForm(); err != nil {
+                http.Error(w, "bad payload", http.StatusBadRequest)
+                return
+            }
+            // try common form field names
+            username = r.FormValue("user[name]")
+            if username == "" {
+                username = r.FormValue("username")
+            }
+            password = r.FormValue("user[password]")
+            if password == "" {
+                password = r.FormValue("password")
+            }
+            email = r.FormValue("user[email]")
+            if email == "" {
+                email = r.FormValue("email")
+            }
         }
-        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-            http.Error(w, "bad payload", http.StatusBadRequest)
-            return
-        }
-        // reuse DB logic from handleRegister style but simple here
-        if req.Username == "" || req.Password == "" {
+        if username == "" || password == "" {
             http.Error(w, "missing fields", http.StatusBadRequest)
             return
         }
-        // bcrypt
-        hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+        hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
         if err != nil {
             slog.Error("bcrypt failed", "error", err)
             http.Error(w, "server error", http.StatusInternalServerError)
             return
         }
-        _, err = db.ExecContext(context.Background(), "INSERT INTO users (username, password_hash, email) VALUES ($1,$2,$3)", req.Username, string(hash), req.Email)
+        _, err = db.ExecContext(context.Background(), "INSERT INTO users (username, password_hash, email) VALUES ($1,$2,$3)", username, string(hash), email)
         if err != nil {
             slog.Warn("user insert failed", "error", err)
             http.Error(w, "conflict", http.StatusConflict)
             return
         }
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusCreated)
-        w.Write([]byte(`{"status":"ok"}`))
+        // If form submission, redirect to sign-in; if JSON, return JSON
+        if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+            w.Header().Set("Content-Type", "application/json")
+            w.WriteHeader(http.StatusCreated)
+            w.Write([]byte(`{"status":"ok"}`))
+            return
+        }
+        http.Redirect(w, r, "/users/sign_in", http.StatusSeeOther)
     })
 
-    // API: login (JSON)
+    // API: login (accept JSON or form POST)
     mux.HandleFunc("/api/auth/login", func(w http.ResponseWriter, r *http.Request) {
         if r.Method != http.MethodPost {
             http.Error(w, "method", http.StatusMethodNotAllowed)
             return
         }
-        var req struct{
-            Username string `json:"username"`
-            Password string `json:"password"`
-        }
-        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-            http.Error(w, "bad payload", http.StatusBadRequest)
-            return
+        var username, password string
+        if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+            var req struct{
+                Username string `json:"username"`
+                Password string `json:"password"`
+            }
+            if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+                http.Error(w, "bad payload", http.StatusBadRequest)
+                return
+            }
+            username = req.Username
+            password = req.Password
+        } else {
+            if err := r.ParseForm(); err != nil {
+                http.Error(w, "bad payload", http.StatusBadRequest)
+                return
+            }
+            username = r.FormValue("user[email]")
+            if username == "" {
+                username = r.FormValue("username")
+                if username == "" {
+                    username = r.FormValue("user[name]")
+                }
+            }
+            password = r.FormValue("user[password]")
+            if password == "" {
+                password = r.FormValue("password")
+            }
         }
         var hash string
-        err := db.QueryRowContext(context.Background(), "SELECT password_hash FROM users WHERE username=$1", req.Username).Scan(&hash)
+        err := db.QueryRowContext(context.Background(), "SELECT password_hash FROM users WHERE username=$1", username).Scan(&hash)
         if err != nil {
             slog.Warn("user lookup failed", "error", err)
-            http.Error(w, "invalid_credentials", http.StatusUnauthorized)
+            if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+                http.Error(w, "invalid_credentials", http.StatusUnauthorized)
+            } else {
+                http.Redirect(w, r, "/users/sign_in?error=invalid", http.StatusSeeOther)
+            }
             return
         }
-        if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
-            http.Error(w, "invalid_credentials", http.StatusUnauthorized)
+        if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+            if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+                http.Error(w, "invalid_credentials", http.StatusUnauthorized)
+            } else {
+                http.Redirect(w, r, "/users/sign_in?error=invalid", http.StatusSeeOther)
+            }
             return
         }
         // set a simple session cookie
-        sess := base64.RawURLEncoding.EncodeToString([]byte(req.Username + ":" + time.Now().Format(time.RFC3339Nano)))
+        sess := base64.RawURLEncoding.EncodeToString([]byte(username + ":" + time.Now().Format(time.RFC3339Nano)))
         http.SetCookie(w, &http.Cookie{Name: "session", Value: sess, HttpOnly: true, Path: "/", Expires: time.Now().Add(7 * 24 * time.Hour)})
-        w.Header().Set("Content-Type", "application/json")
-        w.Write([]byte(`{"status":"ok"}`))
+        if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+            w.Header().Set("Content-Type", "application/json")
+            w.Write([]byte(`{"status":"ok"}`))
+            return
+        }
+        http.Redirect(w, r, "/", http.StatusSeeOther)
     })
 
     // API: projects (return JSON; prefer Redis cache)
