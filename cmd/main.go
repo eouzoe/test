@@ -16,6 +16,7 @@ import (
     "github.com/jackc/pgx/v5"
     "github.com/jackc/pgx/v5/stdlib"
     "github.com/redis/go-redis/v9"
+    lru "github.com/hashicorp/golang-lru"
     "github.com/valyala/fasthttp"
 )
 
@@ -27,6 +28,7 @@ var (
 
     // LogEnvelope carries a context.Context so trace IDs propagate to goroutines
     syncChan = make(chan LogEnvelope, 1000)
+    projectsLRU *lru.Cache
 
     // Token bucket Redis Lua (atomic) - stored also on disk as scripts/token_bucket.lua
     tokenBucketLua = `
@@ -160,12 +162,24 @@ func initRedis() error {
     }
     rdb = redis.NewClient(opt)
 
-    // Test connection
+    // Test connection; handle WRONGPASS / invalid password by retrying without password
     ctx, cancel := context.WithTimeout(ctx_bg, 3*time.Second)
     defer cancel()
     if err := rdb.Ping(ctx).Err(); err != nil {
-        slog.Error("Redis ping failed", "error", err)
-        return err
+        // Detect wrong password errors and retry without password
+        if strings.Contains(strings.ToLower(err.Error()), "wrongpass") || strings.Contains(strings.ToLower(err.Error()), "invalid password") {
+            slog.Warn("Redis auth failed, retrying without password", "error", err)
+            // Clear password and recreate client
+            opt.Password = ""
+            rdb = redis.NewClient(opt)
+            if err2 := rdb.Ping(ctx).Err(); err2 != nil {
+                slog.Error("Redis ping failed after retry without password", "error", err2)
+                return err2
+            }
+        } else {
+            slog.Error("Redis ping failed", "error", err)
+            return err
+        }
     }
 
     // Load token bucket script into Redis for EVALSHA use
@@ -488,6 +502,13 @@ func main() {
 
     go startBatchWorker()
 
+    // init in-memory projects LRU cache
+    if c, err := lru.New(128); err == nil {
+        projectsLRU = c
+    } else {
+        slog.Warn("failed to init projects LRU cache", "error", err)
+    }
+
     handler := recoverMiddleware(requestHandler)
 
     port := os.Getenv("PORT")
@@ -552,10 +573,29 @@ type Project struct {
 }
 
 func handleProjects(ctx *fasthttp.RequestCtx) {
-    // Simple projects fetch - tolerant if table missing
+    // First try Redis cache if available
+    if rdb != nil {
+        if val, err := rdb.Get(ctx_bg, "projects_cache").Result(); err == nil {
+            ctx.WriteString(val)
+            return
+        } else if err != redis.Nil {
+            slog.Warn("redis get projects_cache failed", "error", err)
+        }
+    }
+
+    // Then try in-memory LRU cache
+    if projectsLRU != nil {
+        if v, ok := projectsLRU.Get("projects"); ok {
+            if s, ok := v.(string); ok {
+                ctx.WriteString(s)
+                return
+            }
+        }
+    }
+
+    // Fallback to DB
     rows, err := db.Query("SELECT id, COALESCE(name,''), COALESCE(description,'') FROM projects ORDER BY id DESC LIMIT 100")
     if err != nil {
-        // If table doesn't exist, return empty list
         slog.Warn("projects query failed", "error", err)
         ctx.WriteString("[]")
         return
@@ -571,6 +611,17 @@ func handleProjects(ctx *fasthttp.RequestCtx) {
         projects = append(projects, p)
     }
     b, _ := json.Marshal(projects)
+    s := string(b)
+
+    // Set caches
+    if rdb != nil {
+        if err := rdb.Set(ctx_bg, "projects_cache", s, 60*time.Second).Err(); err != nil {
+            slog.Warn("failed to set projects_cache in redis", "error", err)
+        }
+    }
+    if projectsLRU != nil {
+        projectsLRU.Add("projects", s)
+    }
     ctx.Write(b)
 }
 

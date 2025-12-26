@@ -14,3 +14,12 @@ CREATE INDEX idx_owner_created ON projects(owner_id, created_at DESC);
 INSERT INTO projects (title, description, owner_id) VALUES 
 ('超強 Go 專案', '這是一個碾壓 Ruby 的範例', 1),
 ('實習判官殺手', '解決所有效能與安全漏洞', 1);
+
+-- Users table for authentication
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    email TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
