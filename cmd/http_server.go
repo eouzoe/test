@@ -3,12 +3,14 @@ package main
 import (
     "context"
     "embed"
+    "encoding/base64"
     "encoding/json"
+    "fmt"
     "html/template"
     "log/slog"
     "net/http"
-    "os"
     "time"
+    "golang.org/x/crypto/bcrypt"
 )
 
 //go:embed templates/*.html
@@ -63,17 +65,21 @@ func renderTemplate(w http.ResponseWriter, name string, r *http.Request, data in
     meta := map[string]interface{}{
         "I18n": i18n[loc],
         "Locale": loc,
+        "Main": name,
     }
+    // CSRF token: set cookie and expose in meta for templates
+    token := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprint(time.Now().UnixNano())))
+    http.SetCookie(w, &http.Cookie{Name: "csrf", Value: token, Path: "/", HttpOnly: true, Expires: time.Now().Add(24 * time.Hour)})
+    meta["CSRF"] = token
     // merge provided data if map
-    switch d := data.(type) {
-    case map[string]interface{}:
+    if dataMap, ok := data.(map[string]interface{}); ok {
         for k, v := range meta {
-            d[k] = v
+            dataMap[k] = v
         }
-        tmpl.ExecuteTemplate(w, name, d)
-    default:
-        tmpl.ExecuteTemplate(w, name, meta)
+        tmpl.ExecuteTemplate(w, "base.html", dataMap)
+        return
     }
+    tmpl.ExecuteTemplate(w, "base.html", meta)
 }
 
 func registerHTTPHandlers(addr string) {
@@ -89,18 +95,22 @@ func registerHTTPHandlers(addr string) {
             http.NotFound(w, r)
             return
         }
-        renderTemplate(w, "home.html", r, nil)
+        renderTemplate(w, "home", r, nil)
     })
 
     // 2. Login
     mux.HandleFunc("/users/sign_in", func(w http.ResponseWriter, r *http.Request) {
-        renderTemplate(w, "login.html", r, nil)
+        renderTemplate(w, "login", r, nil)
+    })
+
+    mux.HandleFunc("/users/sign_up", func(w http.ResponseWriter, r *http.Request) {
+        renderTemplate(w, "register", r, nil)
     })
 
     // 3. Projects page (static page that fetches via HTMX)
     mux.HandleFunc("/projects", func(w http.ResponseWriter, r *http.Request) {
         w.Header().Set("Cache-Control", "public, max-age=60")
-        renderTemplate(w, "projects.html", r, nil)
+        renderTemplate(w, "projects", r, nil)
     })
 
     // API: register (JSON)

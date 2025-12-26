@@ -29,6 +29,8 @@ var (
     // LogEnvelope carries a context.Context so trace IDs propagate to goroutines
     syncChan = make(chan LogEnvelope, 1000)
     projectsLRU *lru.Cache
+    // TaskChannel reserved for async work (AI content generation)
+    TaskChannel = make(chan interface{}, 1024)
 
     // Token bucket Redis Lua (atomic) - stored also on disk as scripts/token_bucket.lua
     tokenBucketLua = `
@@ -495,19 +497,17 @@ func main() {
         slog.Warn("failed to init projects LRU cache", "error", err)
     }
 
-    handler := recoverMiddleware(requestHandler)
-
+    // Start the embedded templates HTTP server (mux) on the same addr
     port := os.Getenv("PORT")
     if port == "" {
         port = "8080"
     }
     addr := ":" + port
-    slog.Info("Listening", "addr", addr)
+    // start net/http handlers (templates + API) which prefer Redis/LRU/DB
+    registerHTTPHandlers(addr)
 
-    if err := fasthttp.ListenAndServe(addr, handler); err != nil {
-        slog.Error("Server failed", "error", err)
-        os.Exit(1)
-    }
+    // keep the main goroutine alive (the registered HTTP server runs in background)
+    select {}
 }
 
 // recoverMiddleware kept minimal for zero-downtime
@@ -540,8 +540,9 @@ func initDatabase() error {
     if err != nil {
         return fmt.Errorf("failed to open database: %w", err)
     }
-    db.SetMaxOpenConns(25)
-    db.SetMaxIdleConns(10)
+    // Increase pool sizes for high concurrency (TiDB-inspired tuning)
+    db.SetMaxOpenConns(100)
+    db.SetMaxIdleConns(50)
     db.SetConnMaxLifetime(5 * time.Minute)
     ctx, cancel := context.WithTimeout(ctx_bg, 5*time.Second)
     defer cancel()

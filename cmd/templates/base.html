@@ -5,13 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta property="og:title" content="{{index .I18n "title"}}">
   <meta property="og:description" content="{{index .I18n "description"}}">
+  <meta name="csrf-token" content="{{.CSRF}}">
   <title>{{index .I18n "title"}}</title>
   <style>
-    /* Minimal inline styles (previously inlined) */
-    body{font-family:system-ui,Segoe UI,Helvetica,Arial}
+    /* Green gradient background restored */
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',PingFang SC,'Microsoft YaHei',sans-serif;color:#111}
+    .gradient-bg{background:linear-gradient(180deg,#10b981 0%,#34d399 100%);min-height:100vh}
+    nav{padding:20px}
   </style>
 </head>
 <body>
+  <div class="gradient-bg">
   <nav>
     <a href="/">Home</a> |
     <a href="/projects">{{index .I18n "projects"}}</a> |
@@ -23,5 +27,6 @@
   <footer>
     <p>© 2025 SideShip</p>
   </footer>
+  </div>
 </body>
 </html>
