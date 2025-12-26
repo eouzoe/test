@@ -1,7 +1,126 @@
 {{ define "content" }}
-  <section style="padding:80px;text-align:center;">
-    <h1>{{index .I18n "title"}}</h1>
-    <p>{{index .I18n "description"}}</p>
-  </section>
+<section class="hero-section position-relative">
+  <div class="hero-bg position-absolute top-0 start-0"></div>
+
+  <div class="hero-shape shape-1 position-absolute"></div>
+  <div class="hero-shape shape-2 position-absolute"></div>
+  <div class="hero-shape shape-3 position-absolute"></div>
+  <div class="hero-shape shape-4 position-absolute"></div>
+
+  <div class="container py-5">
+    <div class="row align-items-center hero-content">
+      <div class="col-lg-8 mx-auto text-center text-white">
+        <h1 class="display-3 fw-bold mb-4">
+          {{index .I18n "title"}}
+        </h1>
+
+        <p class="lead fs-4 mb-5 opacity-90">
+          {{index .I18n "description"}}
+        </p>
+
+        <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
+            <a class="btn btn-light btn-lg px-5 py-3 rounded-pill fw-semibold hero-btn-primary" href="/users/sign_up">
+              <i class="bi bi-rocket-takeoff me-2"></i>開始啟航
+</a>            <a class="btn btn-outline-light btn-lg px-5 py-3 rounded-pill fw-semibold hero-btn-secondary" href="/projects">
+              <i class="bi bi-compass me-2"></i>探索專案
+</a>        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-wave position-absolute bottom-0 start-0">
+    <svg viewBox="0 0 1200 120" preserveAspectRatio="none">
+      <path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z" fill="#ffffff" opacity=".3"></path>
+      <path d="M0,0V15.81C13,36.92,27.64,56.86,47.69,72.05,99.41,111.27,165,111,224.58,91.58c31.15-10.15,60.09-26.07,89.67-39.8,40.92-19,84.73-46,130.83-49.67,36.26-2.85,70.9,9.42,98.6,31.56,31.77,25.39,62.32,62,103.63,73,40.44,10.79,81.35-6.69,119.13-24.28s75.16-39,116.92-43.05c59.73-5.85,113.28,22.88,168.9,38.84,30.2,8.66,59,6.17,87.09-7.5,22.43-10.89,48-26.93,60.65-49.24V0Z" fill="#ffffff" opacity=".5"></path>
+      <path d="M0,0V5.63C149.93,59,314.09,71.32,475.83,42.57c43-7.64,84.23-20.12,127.61-26.46,59-8.63,112.48,12.24,165.56,35.4C827.93,77.22,886,95.24,951.2,90c86.53-7,172.46-45.71,248.8-84.81V0Z" fill="#ffffff"></path>
+    </svg>
+  </div>
+</section>
+
+<section class="features-section py-5 mt-4">
+  <div class="container">
+    <div class="text-center mb-5">
+      <span class="badge features-badge px-3 py-2 rounded-pill mb-3 fs-6">
+        <i class="bi bi-stars me-1"></i> 為什麼選擇 SideShip？
+      </span>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="card feature-card h-100 border-0 rounded-4 overflow-hidden">
+          <div class="card-body p-4 text-center">
+            <div class="feature-icon icon-green mx-auto mb-4 d-flex align-items-center justify-content-center rounded-circle">
+              <i class="bi bi-rocket-takeoff text-white fs-2"></i>
+            </div>
+            <h4 class="card-title fw-bold mb-3">用 AI 打造</h4>
+            <p class="card-text">AI 讓開發變得前所未有的簡單。別找藉口，直接上線！</p>
+          </div>
+          <div class="card-footer bg-transparent border-0 p-4 pt-0">
+            <div class="d-flex justify-content-center">
+              <span class="badge feature-badge badge-green px-3 py-2 rounded-pill">
+                <i class="bi bi-check2-circle me-1"></i> AI 時代
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card feature-card h-100 border-0 rounded-4 overflow-hidden">
+          <div class="card-body p-4 text-center">
+            <div class="feature-icon icon-blue mx-auto mb-4 d-flex align-items-center justify-content-center rounded-circle">
+              <i class="bi bi-chat-heart text-white fs-2"></i>
+            </div>
+            <h4 class="card-title fw-bold mb-3">分享與成長</h4>
+            <p class="card-text">從社群獲得回饋。每個想法都值得被聽見。</p>
+          </div>
+          <div class="card-footer bg-transparent border-0 p-4 pt-0">
+            <div class="d-flex justify-content-center">
+              <span class="badge feature-badge badge-blue px-3 py-2 rounded-pill">
+                <i class="bi bi-heart me-1"></i> 社群力量
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card feature-card h-100 border-0 rounded-4 overflow-hidden">
+          <div class="card-body p-4 text-center">
+            <div class="feature-icon icon-violet mx-auto mb-4 d-flex align-items-center justify-content-center rounded-circle">
+              <i class="bi bi-lightbulb text-white fs-2"></i>
+            </div>
+            <h4 class="card-title fw-bold mb-3">尋找靈感</h4>
+            <p class="card-text">看看其他人在做什麼。找到你的下一個靈感或夥伴。</p>
+          </div>
+          <div class="card-footer bg-transparent border-0 p-4 pt-0">
+            <div class="d-flex justify-content-center">
+              <span class="badge feature-badge badge-violet px-3 py-2 rounded-pill">
+                <i class="bi bi-globe me-1"></i> 全球創客
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-5 my-5">
+  <div class="container">
+    <div class="cta-section rounded-5 p-5 text-center position-relative overflow-hidden">
+      <div class="cta-shape shape-1 position-absolute"></div>
+      <div class="cta-shape shape-2 position-absolute"></div>
+      <div class="cta-shape shape-3 position-absolute"></div>
+
+      <div class="position-relative">
+        <h2 class="display-5 fw-bold text-white mb-3">你的想法值得被實現</h2>
+        <p class="lead text-white opacity-90 mb-4">別再空想，開始動手。有了 AI，你今天就能讓專案上線。</p>
+        <a class="btn btn-light btn-lg px-5 py-3 rounded-pill fw-semibold cta-btn" href="/users/sign_up">
+          <i class="bi bi-arrow-right-circle me-2"></i>開始啟航
+</a>      </div>
+    </div>
+  </div>
+</section>
+
 {{ end }}
-{{/* base.html will render the content block when ExecuteTemplate("base.html", ...) is called */}}

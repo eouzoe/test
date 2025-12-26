@@ -1,15 +1,67 @@
 {{ define "content" }}
-  <section style="display:flex;align-items:center;justify-content:center;min-height:60vh;">
-    <div style="background:white;padding:24px;border-radius:12px;max-width:420px;width:90%;box-shadow:0 8px 24px rgba(0,0,0,0.12);">
-      <h2>註冊</h2>
-      <form action="/api/auth/register" method="post">
-        <input type="hidden" name="csrf" value="{{.CSRF}}" />
-        <label>Username<input name="username" required/></label>
-        <label>Email<input name="email" type="email"/></label>
-        <label>Password<input type="password" name="password" required/></label>
-        <div style="text-align:right;margin-top:12px;"><button type="submit">註冊</button></div>
+<div class="auth-page">
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-icon">
+          <i class="bi bi-person-plus"></i>
+        </div>
+        <h1 class="auth-title">加入創作者行列！</h1>
+        <p class="auth-subtitle">立即開始發布你的副業專案</p>
+        <div class="auth-badge">
+          <i class="bi bi-stars"></i>
+          <span>加入 500+ 位正在發布作品的創作者</span>
+        </div>
+      </div>
+
+      <form class="auth-form" id="new_user" action="/api/auth/register" accept-charset="UTF-8" method="post">
+        <input type="hidden" name="authenticity_token" value="{{.CSRF}}" autocomplete="off" />
+
+        <div class="mb-3">
+          <label class="form-label" for="user_name">名稱</label>
+          <div class="position-relative">
+            <i class="bi bi-person input-icon position-absolute top-50 translate-middle-y"></i>
+            <input class="form-control" placeholder="你的名字" autofocus="autofocus" type="text" name="user[name]" id="user_name" />
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="user_email">電子郵件</label>
+          <div class="position-relative">
+            <i class="bi bi-envelope input-icon position-absolute top-50 translate-middle-y"></i>
+            <input class="form-control" placeholder="you@example.com" autocomplete="email" type="email" value="" name="user[email]" id="user_email" />
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="user_password">
+            密碼
+              <span class="hint">(至少 6 個字元)</span>
+</label>          <div class="position-relative">
+            <i class="bi bi-lock input-icon position-absolute top-50 translate-middle-y"></i>
+            <input class="form-control" placeholder="建立一個強密碼" autocomplete="new-password" type="password" name="user[password]" id="user_password" />
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label" for="user_password_confirmation">確認密碼</label>
+          <div class="position-relative">
+            <i class="bi bi-shield-check input-icon position-absolute top-50 translate-middle-y"></i>
+            <input class="form-control" placeholder="再次輸入密碼" autocomplete="new-password" type="password" name="user[password_confirmation]" id="user_password_confirmation" />
+          </div>
+        </div>
+
+        <input type="submit" name="commit" value="建立帳號" class="btn-auth" data-disable-with="建立帳號" />
+
+        <div class="auth-footer">
+          <span>已經有帳號了？</span>
+          <a href="/users/sign_in">登入</a>
+        </div>
       </form>
     </div>
-  </section>
+
+    <p class="auth-tagline">快速打造，持續發布，讓夢想成真。</p>
+  </div>
+</div>
+
 {{ end }}
-{{/* base.html will render the content block when ExecuteTemplate("base.html", ...) is called */}}

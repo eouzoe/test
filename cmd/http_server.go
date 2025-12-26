@@ -117,6 +117,12 @@ func registerHTTPHandlers(addr string) {
         renderTemplate(w, "projects", r, nil)
     })
 
+    // 4. Blogs page
+    mux.HandleFunc("/blogs", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Cache-Control", "public, max-age=60")
+        renderTemplate(w, "blogs", r, nil)
+    })
+
     // API: register (JSON)
     mux.HandleFunc("/api/auth/register", func(w http.ResponseWriter, r *http.Request) {
         if r.Method != http.MethodPost {
@@ -150,7 +156,40 @@ func registerHTTPHandlers(addr string) {
             http.Error(w, "conflict", http.StatusConflict)
             return
         }
+        w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusCreated)
+        w.Write([]byte(`{"status":"ok"}`))
+    })
+
+    // API: login (JSON)
+    mux.HandleFunc("/api/auth/login", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodPost {
+            http.Error(w, "method", http.StatusMethodNotAllowed)
+            return
+        }
+        var req struct{
+            Username string `json:"username"`
+            Password string `json:"password"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            http.Error(w, "bad payload", http.StatusBadRequest)
+            return
+        }
+        var hash string
+        err := db.QueryRowContext(context.Background(), "SELECT password_hash FROM users WHERE username=$1", req.Username).Scan(&hash)
+        if err != nil {
+            slog.Warn("user lookup failed", "error", err)
+            http.Error(w, "invalid_credentials", http.StatusUnauthorized)
+            return
+        }
+        if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
+            http.Error(w, "invalid_credentials", http.StatusUnauthorized)
+            return
+        }
+        // set a simple session cookie
+        sess := base64.RawURLEncoding.EncodeToString([]byte(req.Username + ":" + time.Now().Format(time.RFC3339Nano)))
+        http.SetCookie(w, &http.Cookie{Name: "session", Value: sess, HttpOnly: true, Path: "/", Expires: time.Now().Add(7 * 24 * time.Hour)})
+        w.Header().Set("Content-Type", "application/json")
         w.Write([]byte(`{"status":"ok"}`))
     })
 

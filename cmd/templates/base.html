@@ -1,32 +1,140 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-TW">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta property="og:title" content="{{index .I18n "title"}}">
-  <meta property="og:description" content="{{index .I18n "description"}}">
-  <meta name="csrf-token" content="{{.CSRF}}">
-  <title>{{index .I18n "title"}}</title>
-  <style>
-    /* Green gradient background restored */
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',PingFang SC,'Microsoft YaHei',sans-serif;color:#111}
-    .gradient-bg{background:linear-gradient(180deg,#10b981 0%,#34d399 100%);min-height:100vh}
-    nav{padding:20px}
-  </style>
-</head>
-<body>
-  <div class="gradient-bg">
-  <nav>
-    <a href="/">Home</a> |
-    <a href="/projects">{{index .I18n "projects"}}</a> |
-    <a href="/users/sign_in">{{index .I18n "login"}}</a>
-  </nav>
-  <main>
-    {{ block "content" . }}{{ end }}
-  </main>
-  <footer>
-    <p>© 2025 SideShip</p>
-  </footer>
-  </div>
-</body>
+  <head>
+    <title>{{index .I18n "title"}}</title>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="description" content="{{index .I18n "description"}}">
+    <meta name="keywords" content="副業專案, 獨立開發者, 創客, 新創, AI, 公開打造">
+    <meta name="author" content="SideShip">
+    <meta name="theme-color" content="#10B981">
+
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SideShip">
+    <meta property="og:title" content="{{index .I18n "title"}}">
+    <meta property="og:description" content="{{index .I18n "description"}}">
+    <meta property="og:url" content="https://sideship.moritarot.com/">
+    <meta property="og:image" content="https://sideship.moritarot.com/og-image.png">
+    <meta property="og:locale" content="zh_TW">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{index .I18n "title"}}">
+    <meta name="twitter:description" content="{{index .I18n "description"}}">
+    <meta name="twitter:image" content="https://sideship.moritarot.com/og-image.png">
+
+    <meta name="csrf-param" content="authenticity_token" />
+    <meta name="csrf-token" content="{{.CSRF}}" />
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"SideShip","url":"https://sideship.moritarot.com/","logo":"https://sideship.moritarot.com/og-image.png","sameAs":[]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"SideShip","description":"AI 時代，人人都能打造產品。把你的點子變成現實，分享給全世界。","url":"https://sideship.moritarot.com/","potentialAction":{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://sideship.moritarot.com/projects?q={search_term_string}"},"query-input":"required name=search_term_string"}}</script>
+
+
+    <link rel="stylesheet" href="/assets/application-bdcf44e010688057456be34eac4d5d0a12100665831dae6c3f7dfe75055741eb.css" data-turbo-track="reload" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script type="importmap" data-turbo-track="reload">{
+  "imports": {
+    "application": "/assets/application-924c14f8901c6bb28efdd3231fb3fc762c8c1cce44a833ccf4a79b5d5574c2ca.js",
+    "@hotwired/turbo-rails": "/assets/turbo.min-3e48f1801baf343469811ff2c47889596fb8b7eb6d8fa63c4d81d0b94dc8c16d.js",
+    "@hotwired/stimulus": "/assets/stimulus.min-dd364f16ec9504dfb72672295637a1c8838773b01c0b441bd41008124c407894.js",
+    "@hotwired/stimulus-loading": "/assets/stimulus-loading-3576ce92b149ad5d6959438c6f291e2426c86df3b874c525b30faad51b0d96b3.js",
+    "bootstrap": "/assets/bootstrap.bundle.min-f3cc8238657f087eba0db1273738d11ad255ce42c3b73ac7a4071f477c4e37a9.js",
+    "trix": "/assets/trix-b6d103912a6c8078fed14e45716425fb78de5abfbe7b626cd5d9b25b35265066.js",
+    "@rails/actiontext": "/assets/actiontext.esm-328ef022563f73c1b9b45ace742bd21330da0f6bd6c1c96d352d52fc8b8857e5.js",
+    "controllers/application": "/assets/controllers/application-368d98631bccbf2349e0d4f8269afb3fe9625118341966de054759d96ea86c7e.js",
+    "controllers/hello_controller": "/assets/controllers/hello_controller-549135e8e7c683a538c3d6d517339ba470fcfb79d62f738a0a089ba41851a554.js",
+    "controllers": "/assets/controllers/index-31a9bee606cbc5cdb1593881f388bbf4c345bf693ea24e124f84b6d5c98ab648.js"
+  }
+}</script>
+<link rel="modulepreload" href="/assets/application-924c14f8901c6bb28efdd3231fb3fc762c8c1cce44a833ccf4a79b5d5574c2ca.js">
+<link rel="modulepreload" href="/assets/turbo.min-3e48f1801baf343469811ff2c47889596fb8b7eb6d8fa63c4d81d0b94dc8c16d.js">
+<link rel="modulepreload" href="/assets/stimulus.min-dd364f16ec9504dfb72672295637a1c8838773b01c0b441bd41008124c407894.js">
+<link rel="modulepreload" href="/assets/stimulus-loading-3576ce92b149ad5d6959438c6f291e2426c86df3b874c525b30faad51b0d96b3.js">
+<link rel="modulepreload" href="/assets/bootstrap.bundle.min-f3cc8238657f087eba0db1273738d11ad255ce42c3b73ac7a4071f477c4e37a9.js">
+<link rel="modulepreload" href="/assets/trix-b6d103912a6c8078fed14e45716425fb78de5abfbe7b626cd5d9b25b35265066.js">
+<link rel="modulepreload" href="/assets/actiontext.esm-328ef022563f73c1b9b45ace742bd21330da0f6bd6c1c96d352d52fc8b8857e5.js">
+<link rel="modulepreload" href="/assets/controllers/application-368d98631bccbf2349e0d4f8269afb3fe9625118341966de054759d96ea86c7e.js">
+<link rel="modulepreload" href="/assets/controllers/hello_controller-549135e8e7c683a538c3d6d517339ba470fcfb79d62f738a0a089ba41851a554.js">
+<link rel="modulepreload" href="/assets/controllers/index-31a9bee606cbc5cdb1593881f388bbf4c345bf693ea24e124f84b6d5c98ab648.js">
+<script type="module">import "application"</script>
+    
+  </head>
+
+
+  <body class="has-transparent-navbar">
+    <nav class="navbar navbar-expand-lg navbar-modern navbar-transparent">
+      <div class="container">
+        <a class="navbar-brand text-decoration-none" href="/">
+          <span class="brand-icon">
+            <i class="bi bi-rocket-takeoff"></i>
+          </span>
+          <span>SideShip</span>
+</a>
+        <button class="navbar-toggler navbar-toggler-modern" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
+          <i class="bi bi-list fs-4"></i>
+        </button>
+
+        <div class="collapse navbar-collapse navbar-collapse-modern" id="navbarMain">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item">
+              <a class="nav-link" href="/projects">專案</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/blogs">部落格</a>
+            </li>
+          </ul>
+
+          <div class="d-flex flex-column flex-lg-row align-items-lg-center gap-2 gap-lg-3">
+              <div class="d-flex flex-column flex-lg-row align-items-stretch align-items-lg-center gap-2">
+                <a class="btn btn-nav-login" href="/users/sign_in">登入</a>
+                <a class="btn btn-nav-signup" href="/users/sign_up">註冊</a>
+              </div>
+
+            <div class="d-none d-lg-block mobile-divider"></div>
+
+            <div class="lang-switcher">
+                <a class="lang-btn " href="/?locale=en">EN</a>
+                <a class="lang-btn active" href="/?locale=zh-TW">中文</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+
+    <div class="container ">
+      {{ block "content" . }}{{ end }}
+
+    </div>
+
+    <footer class="mt-5 py-5 border-top" style="background: var(--neutral-50); border-color: var(--neutral-200) !important;">
+      <div class="container">
+        <div class="row align-items-center">
+          <div class="col-md-6 text-center text-md-start mb-3 mb-md-0">
+            <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-2 mb-2">
+              <span class="brand-icon" style="width: 28px; height: 28px; font-size: 0.9rem;">
+                <i class="bi bi-rocket-takeoff"></i>
+              </span>
+              <span class="fw-bold" style="background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                SideShip
+              </span>
+            </div>
+            <p class="small mb-0" style="color: var(--neutral-500);">&copy; 2025 SideShip. 與世界分享你的副業專案。</p>
+          </div>
+          <div class="col-md-6 text-center text-md-end">
+            <div class="d-flex justify-content-center justify-content-md-end gap-3">
+              <a class="text-decoration-none small" style="color: var(--neutral-500); transition: color 0.2s ease;" href="/projects">
+                專案
+</a>              <a class="text-decoration-none small" style="color: var(--neutral-500); transition: color 0.2s ease;" href="/feedbacks/new">
+                意見回饋
+</a>            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
 </html>
