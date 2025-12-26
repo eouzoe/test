@@ -2,6 +2,9 @@ services:
   app:
     build: .
     ports: ["8080:8080"]
+    sysctls:
+      net.core.somaxconn: 65535
+      net.ipv4.tcp_max_syn_backlog: 16384
     deploy:
       resources:
         limits:
