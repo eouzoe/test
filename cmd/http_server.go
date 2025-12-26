@@ -9,6 +9,7 @@ import (
     "html/template"
     "log/slog"
     "net/http"
+    "os"
     "time"
     "golang.org/x/crypto/bcrypt"
 )
@@ -21,6 +22,8 @@ var tmpl *template.Template
 func initTemplates() error {
     t, err := template.ParseFS(templatesFS, "templates/*.html")
     if err != nil {
+        // Fatal: do not start server with broken templates
+        slog.Error("failed to parse templates", "error", err)
         return err
     }
     tmpl = t
@@ -84,7 +87,8 @@ func renderTemplate(w http.ResponseWriter, name string, r *http.Request, data in
 
 func registerHTTPHandlers(addr string) {
     if err := initTemplates(); err != nil {
-        slog.Warn("failed to parse templates", "error", err)
+        slog.Error("template initialization failed; exiting", "error", err)
+        os.Exit(1)
     }
 
     mux := http.NewServeMux()

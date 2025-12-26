@@ -1,13 +1,14 @@
-{{ define "login" }}
-<section style="display:flex;align-items:center;justify-content:center;min-height:60vh;">
-  <div style="background:white;padding:24px;border-radius:12px;max-width:420px;width:90%;box-shadow:0 8px 24px rgba(0,0,0,0.12);">
-    <h2>登入</h2>
-    <form action="/api/auth/login" method="post">
-      <input type="hidden" name="csrf" value="{{.CSRF}}" />
-      <label>Username<input name="username" required/></label>
-      <label>Password<input type="password" name="password" required/></label>
-      <div style="text-align:right;margin-top:12px;"><button type="submit">登入</button></div>
-    </form>
-  </div>
-</section>
+{{ define "content" }}
+  <section style="display:flex;align-items:center;justify-content:center;min-height:60vh;">
+    <div style="background:white;padding:24px;border-radius:12px;max-width:420px;width:90%;box-shadow:0 8px 24px rgba(0,0,0,0.12);">
+      <h2>登入</h2>
+      <form action="/api/auth/login" method="post">
+        <input type="hidden" name="csrf" value="{{.CSRF}}" />
+        <label>Username<input name="username" required/></label>
+        <label>Password<input type="password" name="password" required/></label>
+        <div style="text-align:right;margin-top:12px;"><button type="submit">登入</button></div>
+      </form>
+    </div>
+  </section>
 {{ end }}
+{{/* base.html will render the content block when ExecuteTemplate("base.html", ...) is called */}}

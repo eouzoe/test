@@ -1,6 +1,7 @@
-{{ define "projects" }}
-<section style="padding:40px;">
-  <h2>Projects</h2>
-  <div id="projects-list" hx-get="/api/projects" hx-trigger="load"></div>
-</section>
+{{ define "content" }}
+  <section style="padding:40px;">
+    <h2>Projects</h2>
+    <div id="projects-list" hx-get="/api/projects" hx-trigger="load"></div>
+  </section>
 {{ end }}
+{{/* base.html will render the content block when ExecuteTemplate("base.html", ...) is called */}}

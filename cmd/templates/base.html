@@ -22,7 +22,7 @@
     <a href="/users/sign_in">{{index .I18n "login"}}</a>
   </nav>
   <main>
-    {{ template .Main . }}
+    {{ block "content" . }}{{ end }}
   </main>
   <footer>
     <p>© 2025 SideShip</p>

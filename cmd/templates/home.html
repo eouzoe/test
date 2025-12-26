@@ -1,6 +1,7 @@
-{{ define "home" }}
-<section style="padding:80px;text-align:center;">
-  <h1>{{index .I18n "title"}}</h1>
-  <p>{{index .I18n "description"}}</p>
-</section>
+{{ define "content" }}
+  <section style="padding:80px;text-align:center;">
+    <h1>{{index .I18n "title"}}</h1>
+    <p>{{index .I18n "description"}}</p>
+  </section>
 {{ end }}
+{{/* base.html will render the content block when ExecuteTemplate("base.html", ...) is called */}}

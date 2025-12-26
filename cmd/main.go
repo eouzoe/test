@@ -11,6 +11,7 @@ import (
     "os"
     "runtime"
     "strings"
+    "net/url"
     "time"
 
     "github.com/jackc/pgx/v5"
@@ -153,10 +154,16 @@ func CheckOwnership(ctx *fasthttp.RequestCtx, resourceOwner string) bool {
 }
 
 func initRedis() error {
-    // Robust parsing of REDIS_URL; on parse failure use localhost default and do not crash
-    opt, err := redis.ParseURL(os.Getenv("REDIS_URL"))
+    // Robust parsing of REDIS_URL; on parse failure try to sanitize then fallback to localhost
+    raw := os.Getenv("REDIS_URL")
+    if raw == "" {
+        raw = "redis://localhost:6379/0"
+    }
+    // sanitize password portion if needed
+    sanitized := sanitizeRedisURL(raw)
+    opt, err := redis.ParseURL(sanitized)
     if err != nil {
-        slog.Warn("Redis ParseURL failed, using localhost default", "error", err)
+        slog.Warn("Redis ParseURL failed after sanitize, using localhost default", "error", err, "raw", raw)
         opt = &redis.Options{Addr: "localhost:6379"}
     }
     rdb = redis.NewClient(opt)
@@ -550,6 +557,35 @@ func initDatabase() error {
         return fmt.Errorf("failed to ping database: %w", err)
     }
     return nil
+}
+
+// sanitizeRedisURL attempts to URL-encode the password portion so ParseURL can handle special chars
+func sanitizeRedisURL(raw string) string {
+    if raw == "" {
+        return raw
+    }
+    // quick parse: find scheme
+    idx := strings.Index(raw, "://")
+    if idx == -1 {
+        return raw
+    }
+    rest := raw[idx+3:]
+    at := strings.Index(rest, "@")
+    if at == -1 {
+        return raw
+    }
+    auth := rest[:at]
+    host := rest[at+1:]
+    if !strings.Contains(auth, ":") {
+        // no password part
+        return raw
+    }
+    parts := strings.SplitN(auth, ":", 2)
+    user := parts[0]
+    pass := parts[1]
+    // URL-encode password
+    passEnc := url.QueryEscape(pass)
+    return raw[:idx+3] + user + ":" + passEnc + "@" + host
 }
 
 // Project representation for API
