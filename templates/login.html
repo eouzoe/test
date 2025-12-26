@@ -1,0 +1,10 @@
+{{ define "content" }}
+<section>
+  <h2>登入</h2>
+  <form hx-post="/api/auth/login" hx-swap="none">
+    <label>Username<input name="username"/></label>
+    <label>Password<input type="password" name="password"/></label>
+    <button type="submit">登入</button>
+  </form>
+</section>
+{{ end }}

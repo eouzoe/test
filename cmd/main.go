@@ -151,35 +151,21 @@ func CheckOwnership(ctx *fasthttp.RequestCtx, resourceOwner string) bool {
 }
 
 func initRedis() error {
-    redisURL := os.Getenv("REDIS_URL")
-    if redisURL == "" {
-        redisURL = "redis://redis:6379/0"
-    }
-    opt, err := redis.ParseURL(redisURL)
+    // Robust parsing of REDIS_URL; on parse failure use localhost default and do not crash
+    opt, err := redis.ParseURL(os.Getenv("REDIS_URL"))
     if err != nil {
-        slog.Warn("Redis URL parse failed, using default", "error", err)
-        opt = &redis.Options{Addr: "redis:6379"}
+        slog.Warn("Redis ParseURL failed, using localhost default", "error", err)
+        opt = &redis.Options{Addr: "localhost:6379"}
     }
     rdb = redis.NewClient(opt)
 
-    // Test connection; handle WRONGPASS / invalid password by retrying without password
+    // Test connection; if Redis is unavailable or auth fails, enter fail-open mode (rdb = nil)
     ctx, cancel := context.WithTimeout(ctx_bg, 3*time.Second)
     defer cancel()
     if err := rdb.Ping(ctx).Err(); err != nil {
-        // Detect wrong password errors and retry without password
-        if strings.Contains(strings.ToLower(err.Error()), "wrongpass") || strings.Contains(strings.ToLower(err.Error()), "invalid password") {
-            slog.Warn("Redis auth failed, retrying without password", "error", err)
-            // Clear password and recreate client
-            opt.Password = ""
-            rdb = redis.NewClient(opt)
-            if err2 := rdb.Ping(ctx).Err(); err2 != nil {
-                slog.Error("Redis ping failed after retry without password", "error", err2)
-                return err2
-            }
-        } else {
-            slog.Error("Redis ping failed", "error", err)
-            return err
-        }
+        slog.Warn("Redis ping failed, entering fail-open mode", "error", err)
+        rdb = nil
+        return nil
     }
 
     // Load token bucket script into Redis for EVALSHA use

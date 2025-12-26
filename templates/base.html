@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta property="og:title" content="{{index .I18n "title"}}">
+  <meta property="og:description" content="{{index .I18n "description"}}">
+  <title>{{index .I18n "title"}}</title>
+  <style>
+    /* Minimal inline styles (previously inlined) */
+    body{font-family:system-ui,Segoe UI,Helvetica,Arial}
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a> |
+    <a href="/projects">{{index .I18n "projects"}}</a> |
+    <a href="/users/sign_in">{{index .I18n "login"}}</a>
+  </nav>
+  <main>
+    {{ template "content" . }}
+  </main>
+  <footer>
+    <p>© 2025 SideShip</p>
+  </footer>
+</body>
+</html>
