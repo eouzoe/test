@@ -353,11 +353,11 @@
                 <span>SideShip</span>
             </div>
             <div class="nav-links">
-                <a href="#projects">專案</a>
+                <a href="#" hx-get="/api/projects" hx-target="#main-content" hx-swap="innerHTML">專案</a>
                 <a href="#blog">部落格</a>
             </div>
             <div class="nav-actions">
-                <a href="#login" class="btn-login">登入</a>
+                <a href="#" class="btn-login" id="btn-open-login">登入</a>
                 <a href="#register" class="btn-register">註冊</a>
                 <div class="lang-selector">
                     <span class="lang-option">EN</span>
@@ -366,8 +366,9 @@
             </div>
         </nav>
 
-        <!-- 主要內容 -->
-        <div class="hero">
+        <!-- 主要內容 (動態載入區) -->
+        <main id="main-content">
+            <div class="hero">
             <h1>讓想法啟航</h1>
             <p>AI 時代，人人都能打造產品。把你的點子變成現實，分享給全世界。</p>
             <div class="cta-buttons">
@@ -384,6 +385,7 @@
 
         <!-- 波浪裝飾 -->
         <div class="wave"></div>
+        </main>
     </div>
 
     <!-- 特色區塊 -->
@@ -439,5 +441,45 @@
             <p>© 2025 SideShip. 與世界分享你的副業專案。</p>
         </div>
     </footer>
+    <!-- Login Modal -->
+    <div id="login-modal" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:9999;">
+        <div style="background:white;color:#111;border-radius:12px;padding:24px;max-width:420px;width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+            <h3 style="margin-bottom:12px;color:#10b981">登入</h3>
+            <form id="login-form">
+                <label style="display:block;margin-bottom:8px;font-size:14px;color:#374151">使用者名稱</label>
+                <input name="username" type="text" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:12px;" />
+                <label style="display:block;margin-bottom:8px;font-size:14px;color:#374151">密碼</label>
+                <input name="password" type="password" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:12px;" />
+                <div style="display:flex;gap:8px;justify-content:flex-end">
+                    <button type="button" id="btn-close-login" style="background:#e5e7eb;padding:8px 12px;border-radius:6px">取消</button>
+                    <button type="submit" style="background:#10b981;color:white;padding:8px 12px;border-radius:6px">登入</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org"></script>
+    <script>
+    document.getElementById('btn-open-login').addEventListener('click', function(e){
+        e.preventDefault();
+        document.getElementById('login-modal').style.display = 'flex';
+    });
+    document.getElementById('btn-close-login').addEventListener('click', function(){
+        document.getElementById('login-modal').style.display = 'none';
+    });
+    document.getElementById('login-form').addEventListener('submit', async function(e){
+        e.preventDefault();
+        const form = e.target;
+        const data = {username: form.username.value, password: form.password.value};
+        const res = await fetch('/api/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+        if(res.ok){
+            document.getElementById('login-modal').style.display = 'none';
+            location.reload();
+        } else {
+            alert('登入失敗');
+        }
+    });
+    </script>
 </body>
 </html>

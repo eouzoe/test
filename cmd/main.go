@@ -7,6 +7,7 @@ import (
     "encoding/json"
     "fmt"
     "log/slog"
+    "golang.org/x/crypto/bcrypt"
     "os"
     "runtime"
     "strings"
@@ -393,6 +394,7 @@ func handleStats(ctx *fasthttp.RequestCtx) {
 }
 
 func handleAPI(ctx *fasthttp.RequestCtx, path string) {
+    // Default content type for API responses
     ctx.SetContentType("application/json")
     switch path {
     case "/api/counter":
@@ -407,6 +409,12 @@ func handleAPI(ctx *fasthttp.RequestCtx, path string) {
         }
         ctx.SetContentType("text/plain")
         fmt.Fprintf(ctx, "Sideship-Killer War-Engine v6\nStatus: Optimized\nRate-Limit: Redis-TokenBucket\nBatch-Sync: Enabled")
+    case "/api/projects":
+        handleProjects(ctx)
+    case "/api/auth/register":
+        handleRegister(ctx)
+    case "/api/auth/login":
+        handleLogin(ctx)
     default:
         ctx.SetStatusCode(fasthttp.StatusNotFound)
         ctx.WriteString(`{"error":"not_found"}`)
@@ -454,6 +462,20 @@ func main() {
         os.Exit(1)
     }
     slog.Info("Database table ready (embedding reserved)")
+
+    // Ensure users table exists for authentication
+    _, err = db.Exec(`
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `)
+    if err != nil {
+        slog.Error("Failed to ensure users table", "error", err)
+        os.Exit(1)
+    }
 
     // Load index.html if present
     for _, p := range []string{"./static/index.html", "./index.html"} {
@@ -520,4 +542,103 @@ func initDatabase() error {
         return fmt.Errorf("failed to ping database: %w", err)
     }
     return nil
+}
+
+// Project representation for API
+type Project struct {
+    ID          int    `json:"id"`
+    Name        string `json:"name"`
+    Description string `json:"description"`
+}
+
+func handleProjects(ctx *fasthttp.RequestCtx) {
+    // Simple projects fetch - tolerant if table missing
+    rows, err := db.Query("SELECT id, COALESCE(name,''), COALESCE(description,'') FROM projects ORDER BY id DESC LIMIT 100")
+    if err != nil {
+        // If table doesn't exist, return empty list
+        slog.Warn("projects query failed", "error", err)
+        ctx.WriteString("[]")
+        return
+    }
+    defer rows.Close()
+    var projects []Project
+    for rows.Next() {
+        var p Project
+        if err := rows.Scan(&p.ID, &p.Name, &p.Description); err != nil {
+            slog.Warn("projects row scan failed", "error", err)
+            continue
+        }
+        projects = append(projects, p)
+    }
+    b, _ := json.Marshal(projects)
+    ctx.Write(b)
+}
+
+func handleRegister(ctx *fasthttp.RequestCtx) {
+    var req struct{
+        Username string `json:"username"`
+        Password string `json:"password"`
+    }
+    if err := json.Unmarshal(ctx.PostBody(), &req); err != nil {
+        ctx.SetStatusCode(fasthttp.StatusBadRequest)
+        ctx.WriteString(`{"error":"invalid_payload"}`)
+        return
+    }
+    if req.Username == "" || req.Password == "" {
+        ctx.SetStatusCode(fasthttp.StatusBadRequest)
+        ctx.WriteString(`{"error":"username_password_required"}`)
+        return
+    }
+    hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+    if err != nil {
+        slog.Error("bcrypt generate failed", "error", err)
+        ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+        ctx.WriteString(`{"error":"server_error"}`)
+        return
+    }
+    _, err = db.Exec("INSERT INTO users (username, password_hash) VALUES ($1,$2)", req.Username, string(hash))
+    if err != nil {
+        slog.Warn("user insert failed", "error", err)
+        ctx.SetStatusCode(fasthttp.StatusConflict)
+        ctx.WriteString(`{"error":"user_exists_or_db_error"}`)
+        return
+    }
+    ctx.SetStatusCode(fasthttp.StatusCreated)
+    ctx.WriteString(`{"status":"ok"}`)
+}
+
+func handleLogin(ctx *fasthttp.RequestCtx) {
+    var req struct{
+        Username string `json:"username"`
+        Password string `json:"password"`
+    }
+    if err := json.Unmarshal(ctx.PostBody(), &req); err != nil {
+        ctx.SetStatusCode(fasthttp.StatusBadRequest)
+        ctx.WriteString(`{"error":"invalid_payload"}`)
+        return
+    }
+    var hash string
+    err := db.QueryRow("SELECT password_hash FROM users WHERE username=$1", req.Username).Scan(&hash)
+    if err != nil {
+        slog.Warn("user lookup failed", "error", err)
+        ctx.SetStatusCode(fasthttp.StatusUnauthorized)
+        ctx.WriteString(`{"error":"invalid_credentials"}`)
+        return
+    }
+    if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
+        ctx.SetStatusCode(fasthttp.StatusUnauthorized)
+        ctx.WriteString(`{"error":"invalid_credentials"}`)
+        return
+    }
+    // On success, set a simple session cookie (opaque value)
+    sess := base64.RawURLEncoding.EncodeToString([]byte(req.Username+":"+time.Now().Format(time.RFC3339Nano)))
+    cookie := fasthttp.Cookie{}
+    cookie.SetKey("session")
+    cookie.SetValue(sess)
+    cookie.SetHTTPOnly(true)
+    cookie.SetSecure(false)
+    cookie.SetPath("/")
+    cookie.SetExpire(time.Now().Add(7 * 24 * time.Hour))
+    ctx.Response.Header.SetCookie(&cookie)
+    ctx.WriteString(`{"status":"ok"}`)
 }
