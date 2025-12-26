@@ -13,6 +13,9 @@ import (
     "strings"
     "net/url"
     "time"
+    "strconv"
+    "sync"
+    xrate "golang.org/x/time/rate"
 
     "github.com/jackc/pgx/v5"
     "github.com/jackc/pgx/v5/stdlib"
@@ -33,8 +36,9 @@ var (
     // TaskChannel reserved for async work (AI content generation)
     TaskChannel = make(chan interface{}, 1024)
 
-    // Token bucket Redis Lua (atomic) - stored also on disk as scripts/token_bucket.lua
-    tokenBucketLua = `
+        // Token bucket Redis Lua (atomic) - stored also on disk as scripts/token_bucket.lua
+        tokenBucketLua = `
+-- Token bucket: fractional refill for smooth shaping
 local key = KEYS[1]
 local capacity = tonumber(ARGV[1])
 local refill_per_sec = tonumber(ARGV[2])
@@ -42,30 +46,29 @@ local now = tonumber(ARGV[3])
 local tokens_needed = tonumber(ARGV[4])
 
 local state = redis.call("HMGET", key, "tokens", "ts")
-local tokens = tonumber(state[1]) or capacity
-local ts = tonumber(state[2]) or 0
+local tokens = tonumber(state[1])
+local ts = tonumber(state[2])
+if tokens == nil then tokens = capacity end
+if ts == nil then ts = now end
 
-if ts == 0 then
-  ts = now
-end
-
-local elapsed = math.floor((now - ts) / 1000)
-if elapsed > 0 then
-  local refill = elapsed * refill_per_sec
-  tokens = math.min(capacity, tokens + refill)
-  ts = now
-end
-
+local elapsed_ms = now - ts
+local refill = (elapsed_ms / 1000.0) * refill_per_sec
+tokens = math.min(capacity, tokens + refill)
 local allowed = 0
 if tokens >= tokens_needed then
-  tokens = tokens - tokens_needed
-  allowed = 1
+    tokens = tokens - tokens_needed
+    allowed = 1
 end
 
-redis.call("HMSET", key, "tokens", tokens, "ts", ts)
+redis.call("HSET", key, "tokens", tokens, "ts", now)
 redis.call("EXPIRE", key, math.ceil(capacity / math.max(refill_per_sec,1))*2)
 return allowed
 `
+        // local in-memory fallback rate limiters
+        localLimiters   = make(map[string]*xrate.Limiter)
+        localLimitersMu sync.Mutex
+        limiterRate     = 5.0
+        limiterBurst    = 50
 )
 
 // LogEnvelope carries request-derived context and payload for batch processing
@@ -168,21 +171,69 @@ func initRedis() error {
     }
     rdb = redis.NewClient(opt)
 
-    // Test connection; if Redis is unavailable or auth fails, enter fail-open mode (rdb = nil)
-    ctx, cancel := context.WithTimeout(ctx_bg, 3*time.Second)
-    defer cancel()
-    if err := rdb.Ping(ctx).Err(); err != nil {
-        slog.Warn("Redis ping failed, entering fail-open mode", "error", err)
-        rdb = nil
-        return nil
+    // Try ping with exponential backoff. If fails, set rdb=nil and start background retries.
+    maxAttempts := 5
+    backoff := time.Second
+    var lastErr error
+    for i := 0; i < maxAttempts; i++ {
+        ctx, cancel := context.WithTimeout(ctx_bg, 2*time.Second)
+        err := rdb.Ping(ctx).Err()
+        cancel()
+        if err == nil {
+            // load script
+            if _, lerr := rdb.ScriptLoad(ctx_bg, tokenBucketLua).Result(); lerr != nil {
+                slog.Warn("Failed to load token-bucket script", "error", lerr)
+            }
+            slog.Info("Redis initialized", "addr", opt.Addr)
+            return nil
+        }
+        lastErr = err
+        slog.Warn("Redis ping failed, will retry", "attempt", i+1, "error", err)
+        time.Sleep(backoff)
+        backoff *= 2
     }
 
-    // Load token bucket script into Redis for EVALSHA use
-    if _, err := rdb.ScriptLoad(ctx, tokenBucketLua).Result(); err != nil {
-        slog.Warn("Failed to load token-bucket script", "error", err)
-    }
-
-    slog.Info("Redis initialized", "addr", opt.Addr)
+    slog.Warn("Redis unavailable after retries, starting background reconnects", "error", lastErr)
+    // degrade to in-memory limiter immediately and try to reconnect in background
+    rdb = nil
+    go func(rawURL string) {
+        attempt := 0
+        b := time.Second
+        for {
+            attempt++
+            slog.Info("attempting redis reconnect", "attempt", attempt)
+            sanitized := sanitizeRedisURL(rawURL)
+            opt2, perr := redis.ParseURL(sanitized)
+            if perr != nil {
+                slog.Warn("redis parse url failed during reconnect", "error", perr)
+                time.Sleep(b)
+                b = b * 2
+                if b > 30*time.Second {
+                    b = 30 * time.Second
+                }
+                continue
+            }
+            client := redis.NewClient(opt2)
+            ctx, cancel := context.WithTimeout(ctx_bg, 3*time.Second)
+            err := client.Ping(ctx).Err()
+            cancel()
+            if err == nil {
+                // success: replace global rdb and load script
+                rdb = client
+                if _, lerr := rdb.ScriptLoad(ctx_bg, tokenBucketLua).Result(); lerr != nil {
+                    slog.Warn("Failed to load token-bucket script after reconnect", "error", lerr)
+                }
+                slog.Info("Redis reconnected", "addr", opt2.Addr)
+                return
+            }
+            slog.Warn("redis reconnect attempt failed", "error", err)
+            time.Sleep(b)
+            b = b * 2
+            if b > 30*time.Second {
+                b = 30 * time.Second
+            }
+        }
+    }(raw)
     return nil
 }
 
@@ -222,23 +273,60 @@ func rateLimitMiddleware(ctx *fasthttp.RequestCtx) bool {
     need := 1
     now := time.Now().UnixMilli()
 
-    res, err := rdb.Eval(ctx_bg, tokenBucketLua, []string{key}, capacity, refill, now, need).Result()
-    if err != nil {
-        slog.Warn("Token-bucket eval failed, fail-open", "error", err)
-        return true
+    // Prefer Redis token-bucket when available
+    if rdb != nil {
+        res, err := rdb.Eval(ctx_bg, tokenBucketLua, []string{key}, capacity, refill, now, need).Result()
+        if err == nil {
+            // Redis returns integer 0/1
+            switch v := res.(type) {
+            case int64:
+                if v == 0 {
+                    ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
+                    ctx.SetContentType("application/json")
+                    ctx.WriteString(`{"error":"rate_limit_exceeded"}`)
+                    return false
+                }
+                return true
+            case string:
+                // some redis clients return string numbers
+                if v == "1" {
+                    return true
+                }
+                ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
+                ctx.SetContentType("application/json")
+                ctx.WriteString(`{"error":"rate_limit_exceeded"}`)
+                return false
+            default:
+                slog.Warn("Unexpected token-bucket response type", "value", res)
+                // fallthrough to local limiter
+            }
+        } else {
+            slog.Warn("Token-bucket eval failed, falling back to local limiter", "error", err)
+            // fallthrough to local limiter
+        }
     }
-    allowed, ok := res.(int64)
-    if !ok {
-        slog.Warn("Unexpected token-bucket response type", "value", res)
-        return true
-    }
-    if allowed == 0 {
+
+    // Local in-memory fallback limiter per IP
+    limiter := getLocalLimiter(ip)
+    if !limiter.Allow() {
         ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
         ctx.SetContentType("application/json")
         ctx.WriteString(`{"error":"rate_limit_exceeded"}`)
         return false
     }
     return true
+}
+
+// getLocalLimiter returns or creates a per-IP in-memory rate limiter
+func getLocalLimiter(ip string) *xrate.Limiter {
+    localLimitersMu.Lock()
+    defer localLimitersMu.Unlock()
+    if l, ok := localLimiters[ip]; ok {
+        return l
+    }
+    l := xrate.NewLimiter(xrate.Limit(limiterRate), limiterBurst)
+    localLimiters[ip] = l
+    return l
 }
 
 // Batch worker: consumes LogEnvelope and writes batch to DB, with anomaly detection
@@ -273,8 +361,13 @@ func startBatchWorker() {
         }
         query += strings.Join(vals, ",")
 
-        spanCtx := StartSpan(ctx_bg, "db.batch_insert")
-        _, err := db.Exec(query, args...)
+        // Use the first envelope's context to carry trace information
+        spanCtx := ctx_bg
+        if len(batch) > 0 && batch[0].Ctx != nil {
+            spanCtx = batch[0].Ctx
+        }
+        spanCtx = StartSpan(spanCtx, "db.batch_insert")
+        _, err := db.ExecContext(spanCtx, query, args...)
         EndSpan(spanCtx, "db.batch_insert", err)
         if err != nil {
             slog.Error("Batch insert failed", "error", err, "batch_size", len(batch))
@@ -402,6 +495,52 @@ func handleStats(ctx *fasthttp.RequestCtx) {
     fmt.Fprintf(ctx, `{"last_sync_count":%d}`, count)
 }
 
+// setGOMAXPROCSFromCgroup adjusts GOMAXPROCS based on cgroup CPU quota if present.
+func setGOMAXPROCSFromCgroup() {
+    // default to NumCPU
+    cpus := runtime.NumCPU()
+    // Try cgroup v2 cpu.max
+    if b, err := os.ReadFile("/sys/fs/cgroup/cpu.max"); err == nil {
+        parts := strings.Fields(string(b))
+        if len(parts) >= 1 {
+            if parts[0] != "max" {
+                // first value is quota (microseconds), second may be period
+                quota, err1 := strconv.ParseFloat(parts[0], 64)
+                period := 100000.0
+                if err1 == nil {
+                    if len(parts) >= 2 {
+                        if p, err2 := strconv.ParseFloat(parts[1], 64); err2 == nil && p > 0 {
+                            period = p
+                        }
+                    }
+                    q := quota / period
+                    if q >= 1 {
+                        cpus = int(q + 0.5)
+                    }
+                }
+            }
+        }
+    } else {
+        // Try cgroup v1 paths
+        if bq, err := os.ReadFile("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"); err == nil {
+            if bp, err2 := os.ReadFile("/sys/fs/cgroup/cpu/cpu.cfs_period_us"); err2 == nil {
+                if q, err3 := strconv.ParseFloat(strings.TrimSpace(string(bq)), 64); err3 == nil {
+                    if p, err4 := strconv.ParseFloat(strings.TrimSpace(string(bp)), 64); err4 == nil && p > 0 {
+                        if q > 0 {
+                            cpus = int((q/p) + 0.5)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if cpus < 1 {
+        cpus = 1
+    }
+    runtime.GOMAXPROCS(cpus)
+    slog.Info("GOMAXPROCS set", "procs", cpus)
+}
+
 func handleAPI(ctx *fasthttp.RequestCtx, path string) {
     // Default content type for API responses
     ctx.SetContentType("application/json")
@@ -434,8 +573,8 @@ func handleAPI(ctx *fasthttp.RequestCtx, path string) {
 var indexHTMLContent []byte
 
 func main() {
-    // Force GOMAXPROCS to 1 to align with Docker 0.5 CPU quota and reduce context switches
-    runtime.GOMAXPROCS(1)
+    // Tune GOMAXPROCS according to container cgroup CPU quota (avoid excess context switches)
+    setGOMAXPROCSFromCgroup()
 
     initLogger()
     slog.Info("Starting War Engine v6", "version", "6.0.0")
